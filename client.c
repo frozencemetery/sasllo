@@ -9,7 +9,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-#define MAGIC 1024
+#define HUGE 1024
 
 int main(int argc, char *argv[]) {
   if (argc != 3) {
@@ -53,10 +53,16 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  char *buf = calloc(1, MAGIC);
+  char *buf = calloc(1, HUGE);
   size_t len;
+
+  /* get mechs */
+  len = recv(conn, buf, HUGE - 1, 0);
+  buf[len] = '\0';
+  printf("mechs: %s\n", buf);
+
   do {
-    len = fread(buf, 1, MAGIC - 1, stdin);
+    len = fread(buf, 1, HUGE - 1, stdin);
     if (len > 0 && buf[len - 1] == '\n') {
       buf[len - 1] = '\0';
     } else {

@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,16 +30,22 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   char *port = argv[1];
+  char *iplocalport;
+  int check = asprintf(&iplocalport, "%s;%s", "0.0.0.0", port);
+  if (check < 0 || !iplocalport) {
+    fprintf(stderr, "no asprintf for you\n");
+    return 1;
+  }
 
   SASL_CHECK(sasl_server_init(NULL, SERVICE));
 
-  /* sasl_conn_t *sconn; */
-  /* SASL_CHECK(sasl_server_new( */
-  /*              SERVICE, NULL, NULL, iplocalport, NULL, NULL, 0, &sconn)); */
+  sasl_conn_t *sconn;
+  SASL_CHECK(sasl_server_new(
+               SERVICE, NULL, NULL, iplocalport, NULL, NULL, 0, &sconn));
 
-  /* const char *mechs; */
-  /* unsigned mlen; */
-  /* SASL_CHECK(sasl_listmech(sconn, NULL, "", " ", "", &mechs, &mlen, NULL)); */
+  const char *mechs;
+  unsigned mlen;
+  SASL_CHECK(sasl_listmech(sconn, NULL, "", " ", "", &mechs, &mlen, NULL));
 
   struct addrinfo hints, *serverdata;
   memset(&hints, 0, sizeof(hints));
@@ -86,14 +94,13 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  /* send mechs */
+  send(conn, mechs, mlen, 0);
+
   char *buf = calloc(1, HUGE);
   int len;
   do {
     len = recv(conn, buf, HUGE - 1, 0);
-    if (len < 0) {
-      fprintf(stderr, "failed to recv!\n");
-      return 1;
-    }
     buf[len] = '\0';
     printf("%s\n", buf);
     len = send(conn, buf, len, 0);

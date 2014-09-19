@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,7 +11,17 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-#define HUGE 1024
+#define SERVICE "sasslo"
+#define HUGE 4096
+
+#define SASL_CHECK(c) \
+  do { \
+    int __v = (c);                                         \
+    if (__v != SASL_OK && __v != SASL_CONTINUE) {          \
+      fprintf(stderr, "%s: %d\n", __FUNCTION__, __LINE__); \
+      return __v;                                          \
+    }                                                      \
+  } while (0);
 
 int main(int argc, char *argv[]) {
   if (argc != 3) {
@@ -24,6 +36,20 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "%s", "big mess come clean it up!\n");
     return ret;
   }
+
+  sasl_conn_t *sconn;
+  char *ipremoteport;
+  int check = asprintf(&ipremoteport, "%s;%s", host, port);
+  if (check < 0 || !ipremoteport) {
+    fprintf(stderr, "no asprintf for you\n");
+    return 1;
+  }
+  SASL_CHECK(sasl_client_new(
+               SERVICE, host, NULL, ipremoteport, NULL, 0, &sconn));
+
+  const char *mechs;
+  unsigned mlen;
+  SASL_CHECK(sasl_listmech(sconn, NULL, "", " ", "", &mechs, &mlen, NULL));
 
   struct addrinfo hints, *serverdata;
   memset(&hints, 0, sizeof(hints));
@@ -61,6 +87,17 @@ int main(int argc, char *argv[]) {
   buf[len] = '\0';
   printf("mechs: %s\n", buf);
 
+  char *mech, *saveptr = NULL;
+  for (mech = strtok_r(buf, " ", &saveptr); mech && !strstr(mechs, mech);
+       mech = strtok_r(NULL, " ", &saveptr));
+  if (!mech) {
+    fprintf(stderr, "no mechanism to agree on!\n");
+    goto done;
+  }
+
+  send(conn, mech, strlen(mech), 0);
+  printf("sent mech: %s\n", mech);
+
   do {
     len = fread(buf, 1, HUGE - 1, stdin);
     if (len > 0 && buf[len - 1] == '\n') {
@@ -71,6 +108,7 @@ int main(int argc, char *argv[]) {
     len = send(conn, buf, len, 0);
   } while (len > 0);
 
+done:
   close(conn);
 
   printf("%s", "aaand we're good.\n");

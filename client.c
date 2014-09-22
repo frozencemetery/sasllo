@@ -11,7 +11,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-#define SERVICE "sasslo"
+#define SERVICE "sasllo"
 #define HUGE 4096
 
 #define SASL_CHECK(c) \
@@ -46,10 +46,6 @@ int main(int argc, char *argv[]) {
   }
   SASL_CHECK(sasl_client_new(
                SERVICE, host, NULL, ipremoteport, NULL, 0, &sconn));
-
-  const char *mechs;
-  unsigned mlen;
-  SASL_CHECK(sasl_listmech(sconn, NULL, "", " ", "", &mechs, &mlen, NULL));
 
   struct addrinfo hints, *serverdata;
   memset(&hints, 0, sizeof(hints));
@@ -87,16 +83,16 @@ int main(int argc, char *argv[]) {
   buf[len] = '\0';
   printf("mechs: %s\n", buf);
 
-  char *mech, *saveptr = NULL;
-  for (mech = strtok_r(buf, " ", &saveptr); mech && !strstr(mechs, mech);
-       mech = strtok_r(NULL, " ", &saveptr));
-  if (!mech) {
-    fprintf(stderr, "no mechanism to agree on!\n");
-    goto done;
+  const char *clientout = NULL;
+  unsigned clientoutlen;
+  sasl_interact_t *prompt_need = NULL;
+  const char *mech;
+  SASL_CHECK(sasl_client_start(
+               sconn, buf, &prompt_need, &clientout, &clientoutlen, &mech));
+  if (!prompt_need) {
+    printf("!prompt_need\n");
   }
-
-  send(conn, mech, strlen(mech), 0);
-  printf("sent mech: %s\n", mech);
+  printf("mech: %s\n", mech);
 
   do {
     len = fread(buf, 1, HUGE - 1, stdin);
@@ -108,7 +104,6 @@ int main(int argc, char *argv[]) {
     len = send(conn, buf, len, 0);
   } while (len > 0);
 
-done:
   close(conn);
 
   printf("%s", "aaand we're good.\n");

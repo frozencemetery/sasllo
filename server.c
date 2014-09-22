@@ -100,14 +100,9 @@ int main(int argc, char *argv[]) {
   char *buf = calloc(1, HUGE);
   int len;
 
-  len = recv(conn, buf, HUGE - 1, 0);
-  buf[len >= 0 ? len : 0] = '\0';
-
-  printf("got mech?  %s\n", buf);
- 
   do {
     len = recv(conn, buf, HUGE - 1, 0);
-    buf[len] = '\0';
+    buf[(len > 0) ? len : 0] = '\0';
     printf("%s\n", buf);
     len = send(conn, buf, len, 0);
     if (len < 0) {

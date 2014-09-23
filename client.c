@@ -86,6 +86,8 @@ int main(int argc, char *argv[]) {
   const char *clientout = NULL;
   unsigned clientoutlen;
   sasl_interact_t *prompt_need = NULL;
+
+  /* TODO(rharwood) I'm not convinced this meets spec */
   const char *mech;
   SASL_CHECK(sasl_client_start(
                sconn, buf, &prompt_need, &clientout, &clientoutlen, &mech));
@@ -93,6 +95,13 @@ int main(int argc, char *argv[]) {
     printf("!prompt_need\n");
   }
   printf("mech: %s\n", mech);
+
+  strcpy(buf, mech);
+  char *ind = buf + strlen(mech) + 1;
+  memcpy(ind, clientout, clientoutlen);
+  ind[clientoutlen] = '\0';
+
+  send(conn, buf, (strlen(mech) + 1) + (clientoutlen + 1), 0);
 
   do {
     len = fread(buf, 1, HUGE - 1, stdin);

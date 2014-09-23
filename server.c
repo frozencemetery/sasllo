@@ -100,6 +100,11 @@ int main(int argc, char *argv[]) {
   char *buf = calloc(1, HUGE);
   int len;
 
+  len = recv(conn, buf, HUGE - 1, 0);
+  printf("mech: %s\n", buf);
+  char *ind = strchr(buf, '\0') + 1;
+  printf("data?: %s\n", ind);
+
   do {
     len = recv(conn, buf, HUGE - 1, 0);
     buf[(len > 0) ? len : 0] = '\0';

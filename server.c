@@ -103,7 +103,17 @@ int main(int argc, char *argv[]) {
   len = recv(conn, buf, HUGE - 1, 0);
   printf("mech: %s\n", buf);
   char *ind = strchr(buf, '\0') + 1;
-  printf("data?: %s\n", ind);
+  printf("data?: %d\n", ind ? 1 : 0);
+
+  const char *serverout;
+  unsigned serveroutlen;
+  SASL_CHECK(sasl_server_start(sconn, buf, ind, len - (buf - ind),
+                               &serverout, &serveroutlen));
+  printf("%d, %s\n", serveroutlen, serverout);
+
+  buf[0] = 's';
+  memcpy(buf + 1, serverout, serveroutlen);
+  len = send(conn, buf, serveroutlen + 1, 0);
 
   do {
     len = recv(conn, buf, HUGE - 1, 0);

@@ -103,6 +103,10 @@ int main(int argc, char *argv[]) {
 
   send(conn, buf, (strlen(mech) + 1) + (clientoutlen + 1), 0);
 
+  len = recv(conn, buf, HUGE - 1, 0);
+  buf[len] = '\0';
+  printf("dat: %s\n", buf + 1);
+
   do {
     len = fread(buf, 1, HUGE - 1, stdin);
     if (len > 0 && buf[len - 1] == '\n') {

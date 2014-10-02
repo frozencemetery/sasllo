@@ -24,6 +24,8 @@
     }                                                      \
   } while (0);
 
+char buf[HUGE]; /* I'm a terrible person */
+
 static void get_connection(char *port, int *fd) {
   struct addrinfo hints, *serverdata;
   memset(&hints, 0, sizeof(hints));
@@ -93,30 +95,23 @@ static void sasl_setup(char *port, sasl_conn_t **sconn) {
   return;
 }
 
-int main(int argc, char *argv[]) {
-  if (argc != 2) {
-    fprintf(stderr, "%s <port>\n", argv[0]);
-    return 1;
-  }
-  char *port = argv[1];
-
-  sasl_conn_t *sconn;
-  sasl_setup(port, &sconn);
-
+static void server_mech_negotiate(sasl_conn_t *sconn, int conn) {
   const char *mechs;
   unsigned mlen;
   SASL_CHECK(sasl_listmech(sconn, NULL, "", " ", "", &mechs, &mlen, NULL));
 
-  int conn;
-  get_connection(port, &conn);
-
-  /* send mechs */
-  send(conn, mechs, mlen, 0);
-
-  char *buf = calloc(1, HUGE);
-  int len;
+  ssize_t len;
+  len = send(conn, mechs, mlen, 0);
+  if (len <= 0) {
+    fprintf(stderr, "%s", "Failed to send mechs to client!\n");
+    exit(len ? len : 1);
+  }
 
   len = recv(conn, buf, HUGE - 1, 0);
+  if (len <= 0) {
+    fprintf(stderr, "%s", "Failed to receive mechs from client!\n");
+    exit(len ? len : 1);
+  }
   printf("mech: %s\n", buf);
   char *ind = strchr(buf, '\0') + 1;
   printf("data?: %d\n", ind ? 1 : 0);
@@ -130,7 +125,30 @@ int main(int argc, char *argv[]) {
   buf[0] = 's';
   memcpy(buf + 1, serverout, serveroutlen);
   len = send(conn, buf, serveroutlen + 1, 0);
+  if (len <= 0) {
+    fprintf(stderr, "%s", "Failed to send response to client!\n");
+    exit(len ? len : 1);
+  }
 
+  return;
+}
+
+int main(int argc, char *argv[]) {
+  if (argc != 2) {
+    fprintf(stderr, "%s <port>\n", argv[0]);
+    return 1;
+  }
+  char *port = argv[1];
+
+  sasl_conn_t *sconn;
+  sasl_setup(port, &sconn);
+
+  int conn;
+  get_connection(port, &conn);
+
+  server_mech_negotiate(sconn, conn);
+
+  ssize_t len;
   do {
     len = recv(conn, buf, HUGE - 1, 0);
     buf[(len > 0) ? len : 0] = '\0';

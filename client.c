@@ -133,16 +133,18 @@ int main(int argc, char *argv[]) {
   client_mech_negotiate(sconn, conn);
 
   ssize_t len;
-  do {
-    len = fread(buf, 1, HUGE - 1, stdin);
-    if (len > 0 && buf[len - 1] == '\n') {
+  while ((len = fread(buf, 1, HUGE - 1, stdin)) > 0) {
+    if (buf[len - 1] == '\n') {
       buf[len - 1] = '\0';
-    } else {
-      buf[len] = '\0';
     }
     len = send(conn, buf, len, 0);
-  } while (len > 0);
+    DIE_IF(len <= 0);
+    len = recv(conn, buf, HUGE, 0);
+    DIE_IF(len <= 0);
+    printf("%s\n", buf);
+  }
 
+ fail:
   close(conn);
 
   printf("%s", "aaand we're good.\n");

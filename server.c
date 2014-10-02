@@ -144,13 +144,12 @@ int main(int argc, char *argv[]) {
   server_mech_negotiate(sconn, conn);
 
   ssize_t len;
-  do {
-    len = recv(conn, buf, HUGE - 1, 0);
-    buf[(len > 0) ? len : 0] = '\0';
+  while ((len = recv(conn, buf, HUGE - 1, 0)) > 0) {
+    buf[len] = '\0';
     printf("%s\n", buf);
     len = send(conn, buf, len, 0);
     DIE_IF(len < 0);
-  } while (len > 0);
+  }
 
  fail:
   close(conn);

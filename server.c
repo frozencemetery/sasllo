@@ -1,27 +1,12 @@
-#define _GNU_SOURCE
+#include "common.h"
 
 #include <netdb.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#include <sasl/sasl.h>
-
 #include <sys/socket.h>
 #include <sys/types.h>
-
-#define SERVICE "sasllo"
-#define HUGE 4096
-
-#define DIE_IF(c)					  \
-  if (c) {						  \
-    fprintf(stderr, "Error in function %s at line %d!\n", \
-	    __FUNCTION__, __LINE__);			  \
-    goto fail;						  \
-  }
-
-char buf[HUGE]; /* I'm a terrible person */
 
 static void get_connection(char *port, int *fd) {
   struct addrinfo hints, *serverdata = NULL;

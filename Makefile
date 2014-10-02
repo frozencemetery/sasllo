@@ -6,6 +6,8 @@ LDFLAGS += $(shell pkg-config --libs libsasl2)
 
 default: client server
 
+client server: common.o
+
 clean:
 	rm -f *.o
 	rm -f client server

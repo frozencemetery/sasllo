@@ -20,7 +20,7 @@
     int __v = (c);                                         \
     if (__v != SASL_OK) {                                  \
       fprintf(stderr, "%s: %d\n", __FUNCTION__, __LINE__); \
-      return __v;                                          \
+      exit(__v);					   \
     }                                                      \
   } while (0);
 
@@ -77,24 +77,33 @@ static void get_connection(char *port, int *fd) {
   return;
 }
 
+static void sasl_setup(char *port, sasl_conn_t **sasl) {
+  char *iplocalport;
+  int ret = asprintf(&iplocalport, "%s;%s", "0.0.0.0", port);
+  if (ret < 0 || !iplocalport) {
+    fprintf(stderr, "no asprintf for you\n");
+    exit(ret);
+  }
+
+  SASL_CHECK(sasl_server_init(NULL, SERVICE));
+
+  sasl_conn_t *sconn;
+  SASL_CHECK(sasl_server_new(SERVICE,
+			     NULL, NULL, iplocalport, NULL, NULL, 0, &sconn));
+
+  *sasl = sconn;
+  return;
+}
+
 int main(int argc, char *argv[]) {
   if (argc != 2) {
     fprintf(stderr, "%s <port>\n", argv[0]);
     return 1;
   }
   char *port = argv[1];
-  char *iplocalport;
-  int check = asprintf(&iplocalport, "%s;%s", "0.0.0.0", port);
-  if (check < 0 || !iplocalport) {
-    fprintf(stderr, "no asprintf for you\n");
-    return 1;
-  }
-
-  SASL_CHECK(sasl_server_init(NULL, SERVICE));
 
   sasl_conn_t *sconn;
-  SASL_CHECK(sasl_server_new(
-               SERVICE, NULL, NULL, iplocalport, NULL, NULL, 0, &sconn));
+  sasl_setup(port, &sconn);
 
   const char *mechs;
   unsigned mlen;

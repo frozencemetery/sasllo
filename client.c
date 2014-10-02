@@ -19,7 +19,7 @@
     int __v = (c);                                         \
     if (__v != SASL_OK) {                                  \
       fprintf(stderr, "%s: %d\n", __FUNCTION__, __LINE__); \
-      return __v;                                          \
+      exit(__v);					   \
     }                                                      \
   } while (0);
 
@@ -56,6 +56,29 @@ static void get_server(char *host, char *port, int *fd) {
   return;
 }
 
+static void sasl_setup(char *host, char *port, sasl_conn_t **sasl) {
+  int ret;
+
+  ret = sasl_client_init(NULL);
+  if (ret != SASL_OK) {
+    fprintf(stderr, "%s", "sasl_client_init error!\n");
+    exit(ret);
+  }
+
+  char *ipremoteport;
+  ret = asprintf(&ipremoteport, "%s;%s", host, port);
+  if (ret < 0 || !ipremoteport) {
+    fprintf(stderr, "no asprintf for you\n");
+    exit(ret);
+  }
+
+  sasl_conn_t *sconn;
+  SASL_CHECK(sasl_client_new(SERVICE,
+			     host, NULL, ipremoteport, NULL, 0, &sconn));
+  *sasl = sconn;
+  return;
+}
+
 int main(int argc, char *argv[]) {
   if (argc != 3) {
     fprintf(stderr, "%s <host> <port>\n", argv[0]);
@@ -64,21 +87,8 @@ int main(int argc, char *argv[]) {
   char *host = argv[1];
   char *port = argv[2];
 
-  int ret = sasl_client_init(NULL);
-  if (ret != SASL_OK) {
-    fprintf(stderr, "%s", "big mess come clean it up!\n");
-    return ret;
-  }
-
   sasl_conn_t *sconn;
-  char *ipremoteport;
-  int check = asprintf(&ipremoteport, "%s;%s", host, port);
-  if (check < 0 || !ipremoteport) {
-    fprintf(stderr, "no asprintf for you\n");
-    return 1;
-  }
-  SASL_CHECK(sasl_client_new(
-               SERVICE, host, NULL, ipremoteport, NULL, 0, &sconn));
+  sasl_setup(host, port, &sconn);
 
   int conn;
   get_server(host, port, &conn);

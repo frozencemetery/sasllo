@@ -24,7 +24,7 @@
     }                                                      \
   } while (0);
 
-void get_connection(char *port, int *fd) {
+static void get_connection(char *port, int *fd) {
   struct addrinfo hints, *serverdata;
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_UNSPEC;

@@ -14,13 +14,11 @@
 #define SERVICE "sasllo"
 #define HUGE 4096
 
-#define SASL_CHECK(c)                                      \
-  do {                                                     \
-    int __v = (c);                                         \
-    if (__v != SASL_OK) {                                  \
-      fprintf(stderr, "%s: %d\n", __FUNCTION__, __LINE__); \
-      exit(__v);					   \
-    }                                                      \
+#define FAIL						  \
+  do {							  \
+    fprintf(stderr, "Error in function %s at line %d!\n", \
+	    __FUNCTION__, __LINE__);			  \
+    exit(1);						  \
   } while (0);
 
 char buf[HUGE]; /* I'm not a nice person */
@@ -31,10 +29,7 @@ static void get_server(char *host, char *port, int *fd) {
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
   int gai_ret = getaddrinfo(host, port, &hints, &serverdata);
-  if (gai_ret) {
-    fprintf(stderr, "%s\n", gai_strerror(gai_ret));
-    exit(gai_ret);
-  }
+  if (gai_ret) FAIL;
 
   int conn = -1;
   for (struct addrinfo *cur = serverdata; cur != NULL && conn == -1;
@@ -49,10 +44,7 @@ static void get_server(char *host, char *port, int *fd) {
     }
   }
   freeaddrinfo(serverdata);
-  if (conn == -1) {
-    fprintf(stderr, "unable to connect to any sockets\n");
-    exit(1);
-  }
+  if (conn == -1) FAIL;
 
   *fd = conn;
   return;
@@ -62,31 +54,21 @@ static void sasl_setup(char *host, char *port, sasl_conn_t **sconn) {
   int ret;
 
   ret = sasl_client_init(NULL);
-  if (ret != SASL_OK) {
-    fprintf(stderr, "%s", "sasl_client_init error!\n");
-    exit(ret);
-  }
+  if (ret != SASL_OK) FAIL;
 
   char *ipremoteport;
   ret = asprintf(&ipremoteport, "%s;%s", host, port);
-  if (ret < 0 || !ipremoteport) {
-    fprintf(stderr, "no asprintf for you\n");
-    exit(ret);
-  }
+  if (ret < 0 || !ipremoteport) FAIL;
 
-  SASL_CHECK(sasl_client_new(SERVICE,
-			     host, NULL, ipremoteport, NULL, 0, sconn));
+  if (sasl_client_new(SERVICE, host, NULL, ipremoteport, NULL, 0, sconn) !=
+      SASL_OK) FAIL;
 
   return;
 }
 
 static void client_mech_negotiate(sasl_conn_t *sconn, int conn) {
   ssize_t len = recv(conn, buf, HUGE - 1, 0);
-  if (len <= 0) {
-    fprintf(stderr, "%s", "Got nothing from server for mechs!\n");
-    close(conn);
-    exit(len ? len : 1);
-  }
+  if (len <= 0) FAIL;
   buf[len] = '\0';
   printf("mechs: %s\n", buf);
 
@@ -94,8 +76,8 @@ static void client_mech_negotiate(sasl_conn_t *sconn, int conn) {
   unsigned clientoutlen = 0;
   sasl_interact_t *prompt_need = NULL;
   const char *mech = NULL;
-  SASL_CHECK(sasl_client_start(sconn, buf, &prompt_need,
-			       &clientout, &clientoutlen, &mech));
+  if (sasl_client_start(sconn, buf, &prompt_need,
+			&clientout, &clientoutlen, &mech) != SASL_OK) FAIL;
   if (prompt_need) {
     printf("%s", "prompt_need!  Continuing anyway though.\n");
   }
@@ -107,16 +89,10 @@ static void client_mech_negotiate(sasl_conn_t *sconn, int conn) {
   ind[clientoutlen] = '\0';
 
   len = send(conn, buf, (strlen(mech) + 1) + (clientoutlen + 1), 0);
-  if (len <= 0) {
-    fprintf(stderr, "%s", "Failed to send mechs to client!\n");
-    exit(len ? len : 1);
-  }
+  if (len <= 0) FAIL;
 
   len = recv(conn, buf, HUGE - 1, 0);
-  if (len <= 0) {
-    fprintf(stderr, "%s", "Failed to recv response to client!\n");
-    exit(len ? len : 1);
-  }
+  if (len <= 0) FAIL;
   buf[len] = '\0';
   printf("dat: %d\n", len > 1);
 

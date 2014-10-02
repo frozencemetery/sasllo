@@ -14,10 +14,10 @@
 #define SERVICE "sasllo"
 #define HUGE 4096
 
-#define SASL_CHECK(c) \
-  do { \
+#define SASL_CHECK(c)                                      \
+  do {                                                     \
     int __v = (c);                                         \
-    if (__v != SASL_OK && __v != SASL_CONTINUE) {          \
+    if (__v != SASL_OK) {                                  \
       fprintf(stderr, "%s: %d\n", __FUNCTION__, __LINE__); \
       return __v;                                          \
     }                                                      \

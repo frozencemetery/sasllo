@@ -24,29 +24,7 @@
     }                                                      \
   } while (0);
 
-int main(int argc, char *argv[]) {
-  if (argc != 2) {
-    fprintf(stderr, "%s <port>\n", argv[0]);
-    return 1;
-  }
-  char *port = argv[1];
-  char *iplocalport;
-  int check = asprintf(&iplocalport, "%s;%s", "0.0.0.0", port);
-  if (check < 0 || !iplocalport) {
-    fprintf(stderr, "no asprintf for you\n");
-    return 1;
-  }
-
-  SASL_CHECK(sasl_server_init(NULL, SERVICE));
-
-  sasl_conn_t *sconn;
-  SASL_CHECK(sasl_server_new(
-               SERVICE, NULL, NULL, iplocalport, NULL, NULL, 0, &sconn));
-
-  const char *mechs;
-  unsigned mlen;
-  SASL_CHECK(sasl_listmech(sconn, NULL, "", " ", "", &mechs, &mlen, NULL));
-
+void get_connection(char *port, int *fd) {
   struct addrinfo hints, *serverdata;
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_UNSPEC;
@@ -55,7 +33,7 @@ int main(int argc, char *argv[]) {
   int gai_ret = getaddrinfo(NULL, port, &hints, &serverdata);
   if (gai_ret) {
     fprintf(stderr, "%s\n", gai_strerror(gai_ret));
-    return gai_ret;
+    exit(gai_ret);
   }
 
   int s = -1;
@@ -79,20 +57,51 @@ int main(int argc, char *argv[]) {
   freeaddrinfo(serverdata);
   if (s == -1) {
     fprintf(stderr, "unable to acquire a socket\n");
-    return 1;
+    exit(1);
   }
 
   if (listen(s, 10) == -1) {
     fprintf(stderr, "failed to listen\n");
     close(s);
-    return 1;
+    exit(1);
   }
 
   int conn = accept(s, NULL, NULL);
   if (conn == -1) {
     fprintf(stderr, "failed to accept\n");
+    exit(1);
+  }
+
+  *fd = conn;
+  close(s);
+  return;
+}
+
+int main(int argc, char *argv[]) {
+  if (argc != 2) {
+    fprintf(stderr, "%s <port>\n", argv[0]);
     return 1;
   }
+  char *port = argv[1];
+  char *iplocalport;
+  int check = asprintf(&iplocalport, "%s;%s", "0.0.0.0", port);
+  if (check < 0 || !iplocalport) {
+    fprintf(stderr, "no asprintf for you\n");
+    return 1;
+  }
+
+  SASL_CHECK(sasl_server_init(NULL, SERVICE));
+
+  sasl_conn_t *sconn;
+  SASL_CHECK(sasl_server_new(
+               SERVICE, NULL, NULL, iplocalport, NULL, NULL, 0, &sconn));
+
+  const char *mechs;
+  unsigned mlen;
+  SASL_CHECK(sasl_listmech(sconn, NULL, "", " ", "", &mechs, &mlen, NULL));
+
+  int conn;
+  get_connection(port, &conn);
 
   /* send mechs */
   send(conn, mechs, mlen, 0);
@@ -126,7 +135,6 @@ int main(int argc, char *argv[]) {
     }
   } while (len > 0);
 
-  close(s);
   close(conn);
 
   /***/

@@ -23,6 +23,39 @@
     }                                                      \
   } while (0);
 
+void get_server(char *host, char *port, int *fd) {
+  struct addrinfo hints, *serverdata;
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  int gai_ret = getaddrinfo(host, port, &hints, &serverdata);
+  if (gai_ret) {
+    fprintf(stderr, "%s\n", gai_strerror(gai_ret));
+    exit(gai_ret);
+  }
+
+  int conn = -1;
+  for (struct addrinfo *cur = serverdata; cur != NULL && conn == -1;
+       cur = cur->ai_next) {
+    conn = socket(cur->ai_family, cur->ai_socktype, cur->ai_protocol);
+    if (conn == -1) {
+      fprintf(stderr, "failed to socket\n");
+    } else if (connect(conn, cur->ai_addr, cur->ai_addrlen) == -1) {
+      close(conn);
+      conn = -1;
+      fprintf(stderr, "failed to connect\n");
+    }
+  }
+  freeaddrinfo(serverdata);
+  if (conn == -1) {
+    fprintf(stderr, "unable to connect to any sockets\n");
+    exit(1);
+  }
+
+  *fd = conn;
+  return;
+}
+
 int main(int argc, char *argv[]) {
   if (argc != 3) {
     fprintf(stderr, "%s <host> <port>\n", argv[0]);
@@ -47,33 +80,8 @@ int main(int argc, char *argv[]) {
   SASL_CHECK(sasl_client_new(
                SERVICE, host, NULL, ipremoteport, NULL, 0, &sconn));
 
-  struct addrinfo hints, *serverdata;
-  memset(&hints, 0, sizeof(hints));
-  hints.ai_family = AF_UNSPEC;
-  hints.ai_socktype = SOCK_STREAM;
-  int gai_ret = getaddrinfo(host, port, &hints, &serverdata);
-  if (gai_ret) {
-    fprintf(stderr, "%s\n", gai_strerror(gai_ret));
-    return 1;
-  }
-
-  int conn = -1;
-  for (struct addrinfo *cur = serverdata; cur != NULL && conn == -1;
-       cur = cur->ai_next) {
-    conn = socket(cur->ai_family, cur->ai_socktype, cur->ai_protocol);
-    if (conn == -1) {
-      fprintf(stderr, "failed to socket\n");
-    } else if (connect(conn, cur->ai_addr, cur->ai_addrlen) == -1) {
-      close(conn);
-      conn = -1;
-      fprintf(stderr, "failed to connect\n");
-    }
-  }
-  freeaddrinfo(serverdata);
-  if (conn == -1) {
-    fprintf(stderr, "unable to connect to any sockets\n");
-    return 1;
-  }
+  int conn;
+  get_server(host, port, &conn);
 
   char *buf = calloc(1, HUGE);
   size_t len;

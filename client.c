@@ -56,7 +56,7 @@ static void get_server(char *host, char *port, int *fd) {
   return;
 }
 
-static void sasl_setup(char *host, char *port, sasl_conn_t **sasl) {
+static void sasl_setup(char *host, char *port, sasl_conn_t **sconn) {
   int ret;
 
   ret = sasl_client_init(NULL);
@@ -72,10 +72,9 @@ static void sasl_setup(char *host, char *port, sasl_conn_t **sasl) {
     exit(ret);
   }
 
-  sasl_conn_t *sconn;
   SASL_CHECK(sasl_client_new(SERVICE,
-			     host, NULL, ipremoteport, NULL, 0, &sconn));
-  *sasl = sconn;
+			     host, NULL, ipremoteport, NULL, 0, sconn));
+
   return;
 }
 

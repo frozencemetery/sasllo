@@ -77,7 +77,7 @@ static void get_connection(char *port, int *fd) {
   return;
 }
 
-static void sasl_setup(char *port, sasl_conn_t **sasl) {
+static void sasl_setup(char *port, sasl_conn_t **sconn) {
   char *iplocalport;
   int ret = asprintf(&iplocalport, "%s;%s", "0.0.0.0", port);
   if (ret < 0 || !iplocalport) {
@@ -87,11 +87,9 @@ static void sasl_setup(char *port, sasl_conn_t **sasl) {
 
   SASL_CHECK(sasl_server_init(NULL, SERVICE));
 
-  sasl_conn_t *sconn;
   SASL_CHECK(sasl_server_new(SERVICE,
-			     NULL, NULL, iplocalport, NULL, NULL, 0, &sconn));
+			     NULL, NULL, iplocalport, NULL, NULL, 0, sconn));
 
-  *sasl = sconn;
   return;
 }
 

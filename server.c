@@ -14,25 +14,27 @@
 #define SERVICE "sasllo"
 #define HUGE 4096
 
-#define FAIL						  \
-  do {							  \
+#define DIE_IF(c)					  \
+  if (c) {						  \
     fprintf(stderr, "Error in function %s at line %d!\n", \
 	    __FUNCTION__, __LINE__);			  \
-    exit(1);						  \
-  } while (0);
+    goto fail;						  \
+  }
 
 char buf[HUGE]; /* I'm a terrible person */
 
 static void get_connection(char *port, int *fd) {
-  struct addrinfo hints, *serverdata;
+  struct addrinfo hints, *serverdata = NULL;
+  int conn = -1;
+  int s = -1;
+
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_flags = AI_PASSIVE;
   int gai_ret = getaddrinfo(NULL, port, &hints, &serverdata);
-  if (gai_ret) FAIL;
+  DIE_IF(gai_ret);
 
-  int s = -1;
   int reuseaddr = 1;
   for (struct addrinfo *cur = serverdata; s == -1 && cur != NULL;
        cur = cur->ai_next) {
@@ -51,43 +53,59 @@ static void get_connection(char *port, int *fd) {
     }
   }
   freeaddrinfo(serverdata);
-  if (s == -1) FAIL;
+  DIE_IF(s == -1);
 
-  if (listen(s, 10) == -1) FAIL;
+  DIE_IF(listen(s, 10) == -1);
 
-  int conn = accept(s, NULL, NULL);
-  if (conn == -1) FAIL;
+  conn = accept(s, NULL, NULL);
+  DIE_IF(conn == -1);
 
   *fd = conn;
   close(s);
   return;
+ fail:
+  if (serverdata) {
+    freeaddrinfo(serverdata);
+  }
+  if (s != -1) {
+    close(s);
+  }
+  if (conn != -1) {
+    close(conn);
+  }
+  exit(1);
 }
 
 static void sasl_setup(char *port, sasl_conn_t **sconn) {
-  char *iplocalport;
+  char *iplocalport = NULL;
   int ret = asprintf(&iplocalport, "%s;%s", "0.0.0.0", port);
-  if (ret < 0 || !iplocalport) FAIL;
+  DIE_IF(ret < 0 || !iplocalport);
 
-  if (sasl_server_init(NULL, SERVICE) != SASL_OK) FAIL;
+  DIE_IF(sasl_server_init(NULL, SERVICE) != SASL_OK);
 
-  if (sasl_server_new(SERVICE, NULL, NULL, iplocalport, NULL, NULL, 0, 
-		      sconn) != SASL_OK) FAIL;
+  DIE_IF(sasl_server_new(SERVICE, NULL, NULL, iplocalport, NULL, NULL, 0, 
+			 sconn) != SASL_OK);
 
   return;
+ fail:
+  if (iplocalport) {
+    free(iplocalport);
+  }
+  exit(1);
 }
 
 static void server_mech_negotiate(sasl_conn_t *sconn, int conn) {
   const char *mechs;
   unsigned mlen;
-  if (sasl_listmech(sconn, NULL, "", " ", "", &mechs, &mlen, NULL) !=
-      SASL_OK) FAIL;
+  DIE_IF(sasl_listmech(sconn, NULL, "", " ", "", &mechs, &mlen, NULL) !=
+	 SASL_OK);
 
   ssize_t len;
   len = send(conn, mechs, mlen, 0);
-  if (len <= 0) FAIL;
+  DIE_IF(len <= 0);
 
   len = recv(conn, buf, HUGE - 1, 0);
-  if (len <= 0) FAIL;
+  DIE_IF(len <= 0);
 
   printf("mech: %s\n", buf);
   char *ind = strchr(buf, '\0') + 1;
@@ -95,16 +113,19 @@ static void server_mech_negotiate(sasl_conn_t *sconn, int conn) {
 
   const char *serverout;
   unsigned serveroutlen;
-  if (sasl_server_start(sconn, buf, ind, len - (buf - ind),
-			&serverout, &serveroutlen) != SASL_OK) FAIL;
+  DIE_IF(sasl_server_start(sconn, buf, ind, len - (buf - ind),
+			   &serverout, &serveroutlen) != SASL_OK);
   printf("%d, %s\n", serveroutlen, serverout);
 
   buf[0] = 's';
   memcpy(buf + 1, serverout, serveroutlen);
   len = send(conn, buf, serveroutlen + 1, 0);
-  if (len <= 0) FAIL;
+  DIE_IF(len <= 0);
 
   return;
+ fail:
+  close(conn);
+  exit(1);
 }
 
 int main(int argc, char *argv[]) {
@@ -128,9 +149,10 @@ int main(int argc, char *argv[]) {
     buf[(len > 0) ? len : 0] = '\0';
     printf("%s\n", buf);
     len = send(conn, buf, len, 0);
-    if (len < 0) FAIL;
+    DIE_IF(len < 0);
   } while (len > 0);
 
+ fail:
   close(conn);
 
   /***/

@@ -38,6 +38,7 @@ static void get_connection(char *port, int *fd) {
     }
   }
   freeaddrinfo(serverdata);
+  serverdata = NULL;
   DIE_IF(s == -1);
 
   DIE_IF(listen(s, 10) == -1);

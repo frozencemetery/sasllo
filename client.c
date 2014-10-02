@@ -30,6 +30,7 @@ static void get_server(char *host, char *port, int *fd) {
     }
   }
   freeaddrinfo(serverdata);
+  serverdata = NULL;
   DIE_IF(conn == -1);
 
   *fd = conn;
@@ -119,9 +120,7 @@ int main(int argc, char *argv[]) {
 
   ssize_t len;
   while ((len = fread(buf, 1, HUGE - 1, stdin)) > 0) {
-    if (buf[len - 1] == '\n') {
-      buf[len - 1] = '\0';
-    }
+    buf[(buf[len - 1] == '\n') ? len - 1 : len] = 0;
     len = send(conn, buf, len, 0);
     DIE_IF(len <= 0);
     len = recv(conn, buf, HUGE, 0);
